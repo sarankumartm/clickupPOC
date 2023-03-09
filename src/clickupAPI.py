@@ -74,8 +74,20 @@ def project_code(title):
     except AttributeError as error:
         return ("Null")
 
+# Millisecond to hour convertor - used for duration tracked.
+
+
+def millisecond_hour_convertor(millis):
+    seconds = (millis/1000) % 60
+    seconds = int(seconds)
+    minutes = (millis/(1000*60)) % 60
+    minutes = int(minutes)
+    hours = (millis/(1000*60*60)) % 24
+    return ("%d:%d:%d" % (hours, minutes, seconds))
 
 # All the task done inside a workspace are fetched are extracted in this fn.
+
+
 def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, folder_id_name, list_id_name):
     try:
         url = f"{CLICKUP_ENDPOINT}/team/{team_id}/time_entries"
@@ -98,7 +110,7 @@ def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, fol
                   "Entered date": epoch_timestamp(data["data"][i]["at"]),
                   "Start Date":epoch_timestamp(data["data"][i]["start"]),
                   "End Date": epoch_timestamp(data["data"][i]["end"]),
-                  "Time Tracked":(int(data["data"][i]["duration"])/(1000*60*60)) % 24,
+                  "Time Tracked":millisecond_hour_convertor(int(data["data"][i]["duration"])),
                   # There is chance for no tasks so having some validation over here, incase of no task "Null" is returned.
                   "Space ID": data["data"][i]["task_location"]["space_id"] if "task_location" in data["data"][i].keys() else "Null",
                   "Folder Name": folder_id_name[data["data"][i]["task_location"]["folder_id"]] if "task_location" in data["data"][i].keys() else "Null",
