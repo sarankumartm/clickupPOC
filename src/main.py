@@ -12,13 +12,13 @@ def main():
         start_date = ''
         end_date = ''
         # Fetching all the member_ids associated with a list.
-        member_ids, folder_id_name, list_id_name = folder_extractor(
+        member_ids, folder_id_name, list_id_name, space_id_name = folder_extractor(
             work_space_id)
         if len(member_ids) == 0:
             return "Empty space / No members found !"
         # Fetching all the tasks.
         tasks = task_extractor(team_id, work_space_id,
-                               member_ids, start_date, end_date, folder_id_name, list_id_name)
+                               member_ids, start_date, end_date, folder_id_name, list_id_name, space_id_name)
         # Returning the final tasks
         for i in tasks:
             print("")

@@ -3,6 +3,7 @@ import requests
 from values import API_KEY, CLICKUP_ENDPOINT, CONTENT_TYPE
 import datetime
 import re
+import pprint
 
 
 # All the members associated with list_id are extracted here.
@@ -43,6 +44,9 @@ def folder_extractor(team_id):
                                     for i in range(len(response_json["folders"]))], [])
         # Removing all the duplicate member_ids fetched.
         member_ids = [*set(folders_lists_members)]
+        # Storing all the space_id and its names in dictionary.
+        space_id_name = {response_json["folders"][folders]["space"]["id"]: response_json["folders"][folders]["space"]["name"] for folders in range(
+            len(response_json["folders"]))}
         # Storing all the folder_id's and their names in dictionary.
         folder_id_name = {response_json["folders"][folders]["id"]: response_json["folders"][folders]["name"] for folders in range(
             len(response_json["folders"]))}
@@ -53,7 +57,7 @@ def folder_extractor(team_id):
                 list_id_name[response_json["folders"][i]["lists"][j]
                              ["id"]] = response_json["folders"][i]["lists"][j]["name"]
 
-        return member_ids, folder_id_name, list_id_name
+        return member_ids, folder_id_name, list_id_name, space_id_name
 
     except Exception as E:
         return {
@@ -69,10 +73,12 @@ def epoch_timestamp(epoch_millisecond):
 # Regular expression to split project code from project title.
 def project_code(title):
     try:
+        if title == None:
+            return None
         val = re.search(r"(?<=PR-).*?(?= )", title).group(0)
         return (val)
     except AttributeError as error:
-        return ("Null")
+        return None
 
 # Millisecond to hour convertor - used for duration tracked.
 
@@ -88,7 +94,7 @@ def millisecond_hour_convertor(millis):
 # All the task done inside a workspace are fetched are extracted in this fn.
 
 
-def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, folder_id_name, list_id_name):
+def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, folder_id_name, list_id_name, space_id_name):
     try:
         url = f"{CLICKUP_ENDPOINT}/team/{team_id}/time_entries"
         query = {
@@ -104,17 +110,19 @@ def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, fol
         response = requests.get(url, headers=headers, params=query)
         data = response.json()
         # Creating an object that contains all the required fields and appending them to task list.
-        tasks = [{"Project Code": project_code(folder_id_name[data["data"][i]["task_location"]["folder_id"]] if "task_location" in data["data"][i].keys() else "Null"),
+        tasks = [{"Project Code": project_code(folder_id_name[data["data"][i]["task_location"]["folder_id"]] if "task_location" in data["data"][i].keys() else None),
+                  "Timer id": data["data"][i]["id"],
                   "User Email address": data["data"][i]["user"]["email"],
                   # Doing all date and time related operations here.
                   "Entered date": epoch_timestamp(data["data"][i]["at"]),
                   "Start Date":epoch_timestamp(data["data"][i]["start"]),
                   "End Date": epoch_timestamp(data["data"][i]["end"]),
-                  "Time Tracked":millisecond_hour_convertor(int(data["data"][i]["duration"])),
+                  "Time Tracked": millisecond_hour_convertor(int(data["data"][i]["duration"])),
                   # There is chance for no tasks so having some validation over here, incase of no task "Null" is returned.
-                  "Space ID": data["data"][i]["task_location"]["space_id"] if "task_location" in data["data"][i].keys() else "Null",
-                  "Folder Name": folder_id_name[data["data"][i]["task_location"]["folder_id"]] if "task_location" in data["data"][i].keys() else "Null",
-                  "List Name": list_id_name[data["data"][i]["task_location"]["list_id"]] if "task_location" in data["data"][i].keys() else "Null",
+                  "Space ID": data["data"][i]["task_location"]["space_id"] if "task_location" in data["data"][i].keys() else None,
+                  "Space Name": space_id_name[data["data"][i]["task_location"]["space_id"]] if "task_location" in data["data"][i].keys() else None,
+                  "Folder Name": folder_id_name[data["data"][i]["task_location"]["folder_id"]] if "task_location" in data["data"][i].keys() else None,
+                  "List Name": list_id_name[data["data"][i]["task_location"]["list_id"]] if "task_location" in data["data"][i].keys() else None,
                   "Task Name": data["data"][i]["task"]["name"] if data["data"][i]["task"] != "0" else "0",
                   "Task ID": data["data"][i]["task"]["id"] if data["data"][i]["task"] != "0" else "0"}
                  for i in range(len(data["data"]))]
