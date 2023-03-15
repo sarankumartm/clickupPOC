@@ -3,7 +3,23 @@ import requests
 from values import API_KEY, CLICKUP_ENDPOINT, CONTENT_TYPE
 import datetime
 import re
-import pprint
+
+
+# Fetching folderless lists.
+def folderless_list_endpoint(space_id):
+    try:
+        # Fetching folderless_list details for a space.
+        url = f"{CLICKUP_ENDPOINT}/space/{space_id}/list"
+        headers = {
+            'Authorization': API_KEY  # Fetching from values.py
+        }
+        response = requests.request("GET", url, headers=headers, data={})
+        response_json = json.loads(response.text)
+        return response_json
+    except Exception as E:
+        return {
+            "Message": f"Error occured in list member extractor - {E}"
+        }
 
 
 # All the members associated with list_id are extracted here.
@@ -23,6 +39,24 @@ def list_members(list_id):
     except Exception as E:
         return {
             "Message": f"Error occured in list member extractor - {E}"
+        }
+
+
+# Folderless list details are extracted here.
+def folderless_list_extractor(folderless_list_response, member_ids, folder_id_name, list_id_name, space_id_name):
+    try:
+        for i in range(len(folderless_list_response)):
+            member_ids.extend(list_members(folderless_list_response[i]["id"]))
+            folder_id_name[folderless_list_response[i]["folder"]
+                           ["id"]] = folderless_list_response[i]["folder"]["name"]
+            list_id_name[folderless_list_response[i]["id"]
+                         ] = folderless_list_response[i]["name"]
+            space_id_name[folderless_list_response[i]["space"]
+                          ["id"]] = folderless_list_response[i]["space"]["name"]
+        return [*set(member_ids)], folder_id_name, list_id_name, space_id_name
+    except Exception as E:
+        return {
+            "Message": f"Error occured in folder extractor - {E}"
         }
 
 
@@ -56,8 +90,13 @@ def folder_extractor(team_id):
             for j in range(len(response_json["folders"][i]["lists"])):
                 list_id_name[response_json["folders"][i]["lists"][j]
                              ["id"]] = response_json["folders"][i]["lists"][j]["name"]
-
-        return member_ids, folder_id_name, list_id_name, space_id_name
+        # Checking for any folderless lists inside a space.
+        folderless_list_response = folderless_list_endpoint(team_id)
+        if len(folderless_list_response["lists"]) == 0:
+            # Incase null returing other values.
+            return member_ids, folder_id_name, list_id_name, space_id_name
+        else:
+            return folderless_list_extractor(folderless_list_response["lists"], member_ids, folder_id_name, list_id_name, space_id_name)
 
     except Exception as E:
         return {
@@ -65,6 +104,7 @@ def folder_extractor(team_id):
         }
 
 
+# All the task related fns.
 # Epoch to timestamp conversion happens in this fn.
 def epoch_timestamp(epoch_millisecond):
     return datetime.datetime.fromtimestamp(int(epoch_millisecond) / 1000).isoformat()
@@ -80,9 +120,8 @@ def project_code(title):
     except AttributeError as error:
         return None
 
+
 # Millisecond to hour convertor - used for duration tracked.
-
-
 def millisecond_hour_convertor(millis):
     seconds = (millis/1000) % 60
     seconds = int(seconds)
@@ -91,9 +130,8 @@ def millisecond_hour_convertor(millis):
     hours = (millis/(1000*60*60)) % 24
     return ("%d:%d:%d" % (hours, minutes, seconds))
 
+
 # All the task done inside a workspace are fetched are extracted in this fn.
-
-
 def task_extractor(team_id, work_space_id, member_ids, start_date, end_date, folder_id_name, list_id_name, space_id_name):
     try:
         url = f"{CLICKUP_ENDPOINT}/team/{team_id}/time_entries"
